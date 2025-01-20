@@ -52,7 +52,7 @@ export async function showEditsView(viewsService: IViewsService): Promise<IChatW
 	return (await viewsService.openView<ChatViewPane>(EditsViewId))?.widget;
 }
 
-export function ensureSideBarChatViewSize(width: number, viewDescriptorService: IViewDescriptorService, layoutService: IWorkbenchLayoutService): void {
+export function ensureSideBarChatViewSize(viewDescriptorService: IViewDescriptorService, layoutService: IWorkbenchLayoutService): void {
 	const location = viewDescriptorService.getViewLocationById(ChatViewId);
 	if (location === ViewContainerLocation.Panel) {
 		return; // panel is typically very wide
@@ -60,8 +60,16 @@ export function ensureSideBarChatViewSize(width: number, viewDescriptorService: 
 
 	const viewPart = location === ViewContainerLocation.Sidebar ? Parts.SIDEBAR_PART : Parts.AUXILIARYBAR_PART;
 	const partSize = layoutService.getSize(viewPart);
-	if (partSize.width < width) {
-		layoutService.setSize(viewPart, { width: width, height: partSize.height });
+
+	let adjustedChatWidth: number | undefined;
+	if (partSize.width < 400 && layoutService.mainContainerDimension.width > 1200) {
+		adjustedChatWidth = 400; // up to 400px if window bounds permit
+	} else if (partSize.width < 300) {
+		adjustedChatWidth = 300; // at minimum 300px
+	}
+
+	if (typeof adjustedChatWidth === 'number') {
+		layoutService.setSize(viewPart, { width: adjustedChatWidth, height: partSize.height });
 	}
 }
 
