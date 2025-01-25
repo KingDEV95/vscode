@@ -60,7 +60,6 @@ import { registerChatEditorActions } from './chatEditorActions.js';
 import { ChatEditorController } from './chatEditorController.js';
 import { ChatEditorInput, ChatEditorInputSerializer } from './chatEditorInput.js';
 import { ChatInputBoxContentProvider } from './chatEdinputInputContentProvider.js';
-import { ChatEditorAutoSaveDisabler, ChatEditorSaving } from './chatEditorSaving.js';
 import { agentSlashCommandToMarkdown, agentToMarkdown } from './chatMarkdownDecorationsRenderer.js';
 import { ChatCompatibilityNotifier, ChatExtensionPointHandler } from './chatParticipant.contribution.js';
 import { ChatPasteProvidersFeature } from './chatPasteProviders.js';
@@ -78,11 +77,12 @@ import { ChatViewsWelcomeHandler } from './viewsWelcome/chatViewsWelcomeHandler.
 import { ILanguageModelIgnoredFilesService, LanguageModelIgnoredFilesService } from '../common/ignoredFiles.js';
 import { ChatGettingStartedContribution } from './actions/chatGettingStarted.js';
 import { Extensions, IConfigurationMigrationRegistry } from '../../../common/configuration.js';
-import { ChatEditorOverlayController } from './chatEditorOverlay.js';
 import { ChatRelatedFilesContribution } from './contrib/chatInputRelatedFilesContrib.js';
 import { ChatQuotasService, ChatQuotasStatusBarEntry, IChatQuotasService } from './chatQuotasService.js';
 import { BuiltinToolsContribution } from './tools/tools.js';
 import { ChatSetupContribution } from './chatSetup.js';
+import { ChatEditorOverlayController } from './chatEditorOverlay.js';
+import '../common/promptSyntax/languageFeatures/promptLinkProvider.js';
 
 // Register configuration
 const configurationRegistry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration);
@@ -123,11 +123,10 @@ configurationRegistry.registerConfiguration({
 			markdownDescription: nls.localize('chat.commandCenter.enabled', "Controls whether the command center shows a menu for actions to control Copilot (requires {0}).", '`#window.commandCenter#`'),
 			default: true
 		},
-		'chat.editing.alwaysSaveWithGeneratedChanges': {
-			type: 'boolean',
-			scope: ConfigurationScope.APPLICATION,
-			markdownDescription: nls.localize('chat.editing.alwaysSaveWithGeneratedChanges', "Whether files that have changes made by chat can be saved without confirmation."),
-			default: false,
+		'chat.editing.autoAcceptDelay': {
+			type: 'number',
+			markdownDescription: nls.localize('chat.editing.autoAcceptDelay', "Delay after which changes made by chat are automatically accepted. Values are in seconds, `0` means disabled and `100` seconds is the maximum."),
+			default: 0,
 		},
 		'chat.editing.confirmEditRequestRemoval': {
 			type: 'boolean',
@@ -315,8 +314,6 @@ registerWorkbenchContribution2(ChatCompatibilityNotifier.ID, ChatCompatibilityNo
 registerWorkbenchContribution2(ChatCommandCenterRendering.ID, ChatCommandCenterRendering, WorkbenchPhase.BlockRestore);
 registerWorkbenchContribution2(ChatImplicitContextContribution.ID, ChatImplicitContextContribution, WorkbenchPhase.Eventually);
 registerWorkbenchContribution2(ChatRelatedFilesContribution.ID, ChatRelatedFilesContribution, WorkbenchPhase.Eventually);
-registerWorkbenchContribution2(ChatEditorSaving.ID, ChatEditorSaving, WorkbenchPhase.AfterRestored);
-registerWorkbenchContribution2(ChatEditorAutoSaveDisabler.ID, ChatEditorAutoSaveDisabler, WorkbenchPhase.BlockRestore);
 registerWorkbenchContribution2(ChatViewsWelcomeHandler.ID, ChatViewsWelcomeHandler, WorkbenchPhase.BlockStartup);
 registerWorkbenchContribution2(ChatGettingStartedContribution.ID, ChatGettingStartedContribution, WorkbenchPhase.Eventually);
 registerWorkbenchContribution2(ChatSetupContribution.ID, ChatSetupContribution, WorkbenchPhase.BlockRestore);
@@ -339,8 +336,8 @@ registerChatDeveloperActions();
 registerChatEditorActions();
 
 registerEditorFeature(ChatPasteProvidersFeature);
+registerEditorContribution(ChatEditorOverlayController.ID, ChatEditorOverlayController, EditorContributionInstantiation.Lazy);
 registerEditorContribution(ChatEditorController.ID, ChatEditorController, EditorContributionInstantiation.Eventually);
-registerEditorContribution(ChatEditorOverlayController.ID, ChatEditorOverlayController, EditorContributionInstantiation.Eventually);
 
 registerSingleton(IChatService, ChatService, InstantiationType.Delayed);
 registerSingleton(IChatWidgetService, ChatWidgetService, InstantiationType.Delayed);

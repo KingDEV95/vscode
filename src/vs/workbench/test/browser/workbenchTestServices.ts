@@ -2134,6 +2134,7 @@ export class TestQuickInputService implements IQuickInputService {
 	accept(): Promise<void> { throw new Error('not implemented.'); }
 	back(): Promise<void> { throw new Error('not implemented.'); }
 	cancel(): Promise<void> { throw new Error('not implemented.'); }
+	setAlignment(alignment: 'top' | 'center' | { top: number; left: number }): void { throw new Error('not implemented.'); }
 }
 
 class TestLanguageDetectionService implements ILanguageDetectionService {
@@ -2247,6 +2248,8 @@ export class TestWorkbenchExtensionManagementService implements IWorkbenchExtens
 	getExtensions(): Promise<IResourceExtension[]> { throw new Error('Method not implemented.'); }
 	resetPinnedStateForAllUserExtensions(pinned: boolean): Promise<void> { throw new Error('Method not implemented.'); }
 	getInstallableServers(extension: IGalleryExtension): Promise<IExtensionManagementServer[]> { throw new Error('Method not implemented.'); }
+	isPublisherTrusted(extension: IGalleryExtension): boolean { return false; }
+	trustPublishers(...publishers: string[]): void { }
 }
 
 export class TestUserDataProfileService implements IUserDataProfileService {
