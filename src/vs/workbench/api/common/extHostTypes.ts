@@ -2141,26 +2141,30 @@ export class TerminalProfile implements vscode.TerminalProfile {
 export enum TerminalCompletionItemKind {
 	File = 0,
 	Folder = 1,
-	Flag = 2,
-	Method = 3,
+	Method = 2,
+	Alias = 3,
 	Argument = 4,
-	Alias = 5
+	Option = 5,
+	OptionValue = 6,
+	Flag = 7,
 }
 
 export class TerminalCompletionItem implements vscode.TerminalCompletionItem {
-	label: string;
+	label: string | CompletionItemLabel;
 	icon?: ThemeIcon | undefined;
 	detail?: string | undefined;
+	documentation?: string | vscode.MarkdownString | undefined;
 	isFile?: boolean | undefined;
 	isDirectory?: boolean | undefined;
 	isKeyword?: boolean | undefined;
 	replacementIndex: number;
 	replacementLength: number;
 
-	constructor(label: string, icon?: ThemeIcon, detail?: string, isFile?: boolean, isDirectory?: boolean, isKeyword?: boolean, replacementIndex?: number, replacementLength?: number) {
+	constructor(label: string | CompletionItemLabel, icon?: ThemeIcon, detail?: string, documentation?: string | vscode.MarkdownString, isFile?: boolean, isDirectory?: boolean, isKeyword?: boolean, replacementIndex?: number, replacementLength?: number) {
 		this.label = label;
 		this.icon = icon;
 		this.detail = detail;
+		this.documentation = documentation;
 		this.isFile = isFile;
 		this.isDirectory = isDirectory;
 		this.isKeyword = isKeyword;
@@ -2200,6 +2204,7 @@ export class TerminalCompletionList<T extends TerminalCompletionItem = TerminalC
 export interface TerminalResourceRequestConfig {
 	filesRequested?: boolean;
 	foldersRequested?: boolean;
+	fileExtensions?: string[];
 	cwd?: vscode.Uri;
 }
 
@@ -4714,6 +4719,10 @@ export class ChatReferenceBinaryData implements vscode.ChatReferenceBinaryData {
 	}
 }
 
+export class ChatReferenceDiagnostic implements vscode.ChatReferenceDiagnostic {
+	constructor(public readonly diagnostics: [vscode.Uri, vscode.Diagnostic[]][]) { }
+}
+
 export enum LanguageModelChatMessageRole {
 	User = 1,
 	Assistant = 2,
@@ -4731,6 +4740,14 @@ export class LanguageModelToolResultPart implements vscode.LanguageModelToolResu
 		this.content = content;
 		this.isError = isError ?? false;
 	}
+}
+
+export class PreparedTerminalToolInvocation {
+	constructor(
+		public readonly command: string,
+		public readonly language: string,
+		public readonly confirmationMessages?: vscode.LanguageModelToolConfirmationMessages,
+	) { }
 }
 
 export class LanguageModelChatMessage implements vscode.LanguageModelChatMessage {

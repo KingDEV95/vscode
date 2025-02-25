@@ -680,8 +680,8 @@ async function evaluateDiagnosticsCommitHook(repository: Repository, options: Co
 	const view = l10n.t('View Problems');
 
 	const message = changesDiagnostics.length === 1
-		? l10n.t('The following file has unresolved diagnostic information: \'{0}\'.\n\nHow would you like to proceed?', path.basename(changesDiagnostics[0][0].fsPath))
-		: l10n.t('There are {0} files that have unresolved diagnostic information.\n\nHow would you like to proceed?', changesDiagnostics.length);
+		? l10n.t('The following file has unresolved diagnostics: \'{0}\'.\n\nHow would you like to proceed?', path.basename(changesDiagnostics[0][0].fsPath))
+		: l10n.t('There are {0} files that have unresolved diagnostics.\n\nHow would you like to proceed?', changesDiagnostics.length);
 
 	const choice = await window.showWarningMessage(message, { modal: true }, commit, view);
 
@@ -1628,19 +1628,29 @@ export class CommandCenter {
 		}
 
 		let modifiedUri = changes.modifiedUri;
+		let modifiedDocument: TextDocument | undefined;
+
 		if (!modifiedUri) {
 			const textEditor = window.activeTextEditor;
 			if (!textEditor) {
 				return;
 			}
-			const modifiedDocument = textEditor.document;
+
+			modifiedDocument = textEditor.document;
 			modifiedUri = modifiedDocument.uri;
 		}
+
 		if (modifiedUri.scheme !== 'file') {
 			return;
 		}
+
+		if (!modifiedDocument) {
+			modifiedDocument = await workspace.openTextDocument(modifiedUri);
+		}
+
 		const result = changes.originalWithModifiedChanges;
-		await this.runByRepository(modifiedUri, async (repository, resource) => await repository.stage(resource, result));
+		await this.runByRepository(modifiedUri, async (repository, resource) =>
+			await repository.stage(resource, result, modifiedDocument.encoding));
 	}
 
 	@command('git.stageSelectedRanges', { diff: true })
@@ -1817,7 +1827,8 @@ export class CommandCenter {
 		const originalDocument = await workspace.openTextDocument(originalUri);
 		const result = applyLineChanges(originalDocument, modifiedDocument, changes);
 
-		await this.runByRepository(modifiedUri, async (repository, resource) => await repository.stage(resource, result));
+		await this.runByRepository(modifiedUri, async (repository, resource) =>
+			await repository.stage(resource, result, modifiedDocument.encoding));
 	}
 
 	@command('git.revertChange')
@@ -1949,6 +1960,17 @@ export class CommandCenter {
 			return;
 		}
 
+		const repository = this.model.getRepository(modifiedUri);
+		if (!repository) {
+			return;
+		}
+
+		const resource = repository.indexGroup.resourceStates
+			.find(r => pathEquals(r.resourceUri.fsPath, modifiedUri.fsPath));
+		if (!resource) {
+			return;
+		}
+
 		const indexDiffInformation = getIndexDiffInformation(textEditor);
 		if (!indexDiffInformation) {
 			return;
@@ -1960,7 +1982,7 @@ export class CommandCenter {
 		this.logger.trace(`[CommandCenter][unstageSelectedRanges] diffInformation: ${JSON.stringify(indexDiffInformation)}`);
 		this.logger.trace(`[CommandCenter][unstageSelectedRanges] diffInformation changes: ${JSON.stringify(indexLineChanges)}`);
 
-		const originalUri = toGitUri(modifiedUri, 'HEAD');
+		const originalUri = toGitUri(resource.original, 'HEAD');
 		const originalDocument = await workspace.openTextDocument(originalUri);
 		const selectedLines = toLineRanges(textEditor.selections, modifiedDocument);
 		const selectedDiffs = indexLineChanges
@@ -1978,7 +2000,7 @@ export class CommandCenter {
 		this.logger.trace(`[CommandCenter][unstageSelectedRanges] invertedDiffs: ${JSON.stringify(invertedDiffs)}`);
 
 		const result = applyLineChanges(modifiedDocument, originalDocument, invertedDiffs);
-		await this.runByRepository(modifiedUri, async (repository, resource) => await repository.stage(resource, result));
+		await repository.stage(modifiedUri, result, modifiedDocument.encoding);
 	}
 
 	@command('git.unstageFile')
