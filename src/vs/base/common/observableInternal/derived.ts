@@ -100,8 +100,8 @@ export function derivedHandleChanges<T, TChangeSummary>(
 }
 
 export function derivedWithStore<T>(computeFn: (reader: IReader, store: DisposableStore) => T): IObservable<T>;
-export function derivedWithStore<T>(owner: object, computeFn: (reader: IReader, store: DisposableStore) => T): IObservable<T>;
-export function derivedWithStore<T>(computeFnOrOwner: ((reader: IReader, store: DisposableStore) => T) | object, computeFnOrUndefined?: ((reader: IReader, store: DisposableStore) => T)): IObservable<T> {
+export function derivedWithStore<T>(owner: DebugOwner, computeFn: (reader: IReader, store: DisposableStore) => T): IObservable<T>;
+export function derivedWithStore<T>(computeFnOrOwner: ((reader: IReader, store: DisposableStore) => T) | DebugOwner, computeFnOrUndefined?: ((reader: IReader, store: DisposableStore) => T)): IObservable<T> {
 	let computeFn: (reader: IReader, store: DisposableStore) => T;
 	let owner: DebugOwner;
 	if (computeFnOrUndefined === undefined) {
@@ -112,16 +112,23 @@ export function derivedWithStore<T>(computeFnOrOwner: ((reader: IReader, store: 
 		computeFn = computeFnOrUndefined as any;
 	}
 
-	const store = new DisposableStore();
+	// Intentionally re-assigned in case an inactive observable is re-used later
+	// eslint-disable-next-line local/code-no-potentially-unsafe-disposables
+	let store = new DisposableStore();
+
 	return new Derived(
 		new DebugNameData(owner, undefined, computeFn),
 		r => {
-			store.clear();
+			if (store.isDisposed) {
+				store = new DisposableStore();
+			} else {
+				store.clear();
+			}
 			return computeFn(r, store);
 		}, undefined,
 		undefined,
 		() => store.dispose(),
-		strictEquals
+		strictEquals,
 	);
 }
 
@@ -271,17 +278,16 @@ export class Derived<T, TChangeSummary = any> extends BaseObservable<T, void> im
 					this._state = DerivedState.upToDate;
 				}
 
-				this._recomputeIfNeeded();
+				if (this._state !== DerivedState.upToDate) {
+					this._recompute();
+				}
 				// In case recomputation changed one of our dependencies, we need to recompute again.
 			} while (this._state !== DerivedState.upToDate);
 			return this.value!;
 		}
 	}
 
-	private _recomputeIfNeeded() {
-		if (this._state === DerivedState.upToDate) {
-			return;
-		}
+	private _recompute() {
 		const emptySet = this.dependenciesToBeRemoved;
 		this.dependenciesToBeRemoved = this._dependencies;
 		this._dependencies = emptySet;
