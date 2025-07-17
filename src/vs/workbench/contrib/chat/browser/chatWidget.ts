@@ -1170,6 +1170,9 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			}
 			this.inputContainer = dom.$('.empty-chat-state');
 		}
+
+		this.input.dispose();
+
 		if (isInput) {
 			this.inputPart.element.classList.remove('editing');
 		}
@@ -1653,7 +1656,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			const isUserQuery = !query;
 
 			const instructionsEnabled = PromptsConfig.enabled(this.configurationService);
-			if (instructionsEnabled) {
+			if (instructionsEnabled && !this.viewModel.editing) {
 				// process the prompt command
 				await this._applyPromptFileIfSet(requestInputs);
 				await this._autoAttachInstructions(requestInputs);
@@ -1748,18 +1751,16 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		return undefined;
 	}
 
-	getUserSelectedTools(): Record<string, boolean> | undefined {
-		const userSelectedTools: Record<string, boolean> = {};
-		for (const [tool, enablement] of this.input.selectedToolsModel.asEnablementMap()) {
-			userSelectedTools[tool.id] = enablement;
-		}
-		return userSelectedTools;
-	}
-
 	getModeRequestOptions(): Partial<IChatSendRequestOptions> {
 		return {
 			modeInstructions: this.input.currentModeObs.get().body?.get(),
-			userSelectedTools: this.getUserSelectedTools(),
+			userSelectedTools: this.input.selectedToolsModel.enablementMap.map(map => {
+				const userSelectedTools: Record<string, boolean> = {};
+				for (const [tool, enablement] of map) {
+					userSelectedTools[tool.id] = enablement;
+				}
+				return userSelectedTools;
+			}),
 			mode: this.input.currentModeKind,
 		};
 	}
@@ -1998,7 +1999,8 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	 */
 	private async _autoAttachInstructions({ attachedContext }: IChatRequestInputOptions): Promise<void> {
 		let readFileTool = this.toolsService.getToolByName('readFile');
-		if (readFileTool && this.getUserSelectedTools()?.[readFileTool.id] === false) {
+		const enablementMap = this.input.selectedToolsModel.enablementMap.get();
+		if (readFileTool && Iterable.some(enablementMap, ([tool, enabled]) => tool.id === readFileTool!.id && enabled === false)) {
 			readFileTool = undefined;
 		}
 
