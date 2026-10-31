@@ -15,6 +15,7 @@ import { basename } from '../../../../../base/common/resources.js';
 import { ThemeIcon } from '../../../../../base/common/themables.js';
 import { URI } from '../../../../../base/common/uri.js';
 import { localize } from '../../../../../nls.js';
+import { hasReadableCustomizationContent } from '../../../../../platform/agentHost/common/agentHostCustomizationUri.js';
 import { ICustomizationMarketplaceResource } from '../../../../../platform/customizationMarketplace/common/customizationMarketplaceService.js';
 import { ExtensionIdentifier } from '../../../../../platform/extensions/common/extensions.js';
 import { IFileService } from '../../../../../platform/files/common/files.js';
@@ -79,7 +80,7 @@ export interface IAICustomizationListItem {
 	/** When true, this syncable item is currently selected for syncing. */
 	readonly synced?: boolean;
 	nameMatches?: IMatch[];
-	descriptionMatches?: IMatch[];
+	secondaryTextMatches?: IMatch[];
 }
 
 /**
@@ -144,6 +145,10 @@ export async function expandHookFileItems(
 	const userHome = userHomeUri.scheme === Schemas.file ? userHomeUri.fsPath : userHomeUri.path;
 
 	for (const item of hookFileItems) {
+		if (!hasReadableCustomizationContent(item.uri)) {
+			items.push(item);
+			continue;
+		}
 		let parsedHooks = false;
 		try {
 			const content = await fileService.readFile(item.uri);
@@ -217,7 +222,7 @@ export class AICustomizationItemNormalizer {
 			id: `${item.uri.toString()}${duplicateSuffix}`,
 			uri: item.uri,
 			name: item.name,
-			filename: item.uri.scheme === Schemas.file
+			filename: item.uri.scheme === Schemas.file || item.uri.scheme === Schemas.vscodeRemote
 				? this.labelService.getUriLabel(item.uri, { relative: isWorkspaceItem })
 				: basename(item.uri),
 			description: item.description,
